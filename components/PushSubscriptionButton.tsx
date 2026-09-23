@@ -48,10 +48,10 @@ export default function PushSubscriptionButton() {
       }
       const convertedVapidKey = urlBase64ToUint8Array(publicKey);
 
-      // 5. 브라우저 PushManager로 구독 신청
+      // 5. 브라우저 PushManager로 구독 신청 (타입 단언 적용)
       const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: applicationServerKey as unknown as BufferSource, // 👈 as unknown as BufferSource 추가
+        userVisibleOnly: true, // 사용자가 볼 수 있는 알림만 수신
+        applicationServerKey: convertedVapidKey as unknown as BufferSource,
       });
 
       // 6. 생성된 구독 정보(Subscription)를 서버/DB로 전송 및 테스트 발송
