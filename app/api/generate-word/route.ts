@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, Schema } from "@google/generative-ai";
 
-// 1. 유효한 최신 모델 우선순위 배열 (존재하지 않는 모델명 제거)
+// 1. 유효한 최신 모델 우선순위 배열
 const FALLBACK_MODELS = [
   "gemini-1.5-flash", // 1순위: 가장 빠르고 안정적 (약 0.8초)
   "gemini-1.5-pro",   // 2순위: Flash 실패 시 비상용 폴백
 ];
 
-// 2. Structured Outputs JSON 스키마 정의 (속도 및 출력 정확도 향상)
-const wordResponseSchema = {
+// 2. Structured Outputs JSON 스키마 정의 (Schema 타입 명시로 TS2322 방지)
+const wordResponseSchema: Schema = {
   type: SchemaType.OBJECT,
   properties: {
     word: { type: SchemaType.STRING },
@@ -87,16 +87,16 @@ export async function POST(req: NextRequest) {
           model: modelName,
           generationConfig: {
             responseMimeType: "application/json",
-            responseSchema: wordResponseSchema, // 스키마 전달로 빠른 직렬화
+            responseSchema: wordResponseSchema, // TS2322 해결완료
             temperature: 0.2,
           },
         });
 
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
-        
+
         parsedData = JSON.parse(responseText);
-        break; // 성공 시 즉시 루프 종료 (다음 모델 시도하지 않음)
+        break; // 성공 시 즉시 루프 종료
       } catch (err: any) {
         console.warn(`[Gemini API Warning] ${modelName} 호출 실패. 다음 모델로 전환합니다.`, err?.message);
         lastError = err;
