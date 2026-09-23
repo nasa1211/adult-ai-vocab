@@ -1,18 +1,22 @@
-// app/api/generate-word/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const CANDIDATE_MODELS = [
-"gemini-3.7-flash",       // 1순위: 최신 초고속 모델 (기본 메인, 응답 속도 최상)
-  "gemini-3.6-flash",       // 2순위: 3.7 에러 시 빠른 대체
+  "gemini-3.7-flash",       // 1순위: 최신 초고속 모델
+  "gemini-3.6-flash",       // 2순위: 대체 Flash 모델
   "gemini-3.5-flash",       // 3순위: 검증된 백업 Flash 모델
-  "gemini-3.1-pro-preview", // 4순위: Flash 계열 장애 시 고성능 추론 모델로 전환
-  "gemini-2.5-pro",         // 5순위: 최종 비상용 안정 버전
+  "gemini-3.1-pro-preview", // 4순위: 고성능 추론 모델
+  "gemini-2.5-pro",         // 5순위: 비상용 안정 버전
 ];
 
+// 안전한 JSON 파싱 함수 (이스케이프 및 마크다운 백틱 완벽 제거)
 function safeJsonParse(rawText: string) {
-  let cleanText = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+  let cleanText = rawText.trim();
 
+  // ```json 및 ``` 마크다운 제어
+  cleanText = cleanText.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+  // 순수 JSON 객체 부분만 추출 ({ ... })
   const firstBrace = cleanText.indexOf("{");
   const lastBrace = cleanText.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace !== -1) {
@@ -22,7 +26,12 @@ function safeJsonParse(rawText: string) {
   try {
     return JSON.parse(cleanText);
   } catch (initialError) {
-    const fixedText = cleanText.replace(/\\/g, "\\\\");
+    // 줄바꿈 문자 및 제어 문자 이스케이프 처리 후 재시도
+    const fixedText = cleanText
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r")
+      .replace(/\t/g, "\\t");
+
     return JSON.parse(fixedText);
   }
 }
@@ -40,6 +49,7 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
+      console.error("❌ [API ERROR] GEMINI_API_KEY가 Vercel 환경변수에 설정되지 않았습니다.");
       return NextResponse.json(
         { error: "GEMINI_API_KEY 환경변수가 설정되지 않았습니다." },
         { status: 500 }
@@ -83,34 +93,40 @@ export async function POST(req: NextRequest) {
     let lastError: any = null;
     let parsedData = null;
 
+    // CANDIDATE_MODELS 순차적으로 시도 (Fallback)
     for (const modelName of CANDIDATE_MODELS) {
       try {
         const model = genAI.getGenerativeModel({
           model: modelName,
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.2,
-          },
         });
 
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
-        parsedData = safeJsonParse(responseText);
-        break;
+
+        if (responseText) {
+          parsedData = safeJsonParse(responseText);
+          break; // 성공 시 루프 탈출
+        }
       } catch (err: any) {
+        console.warn(`⚠️ [Gemini Fallback Warning] ${modelName} 호출 실패:`, err?.message || err);
         lastError = err;
       }
     }
 
     if (!parsedData) {
+      console.error("❌ [API ERROR] 모든 Gemini 모델 생성 연쇄 실패:", lastError?.message || lastError);
       return NextResponse.json(
-        { error: "단어 분석 생성 실패", details: lastError?.message },
+        { error: "단어 분석 생성 실패", details: lastError?.message || "All models failed" },
         { status: 500 }
       );
     }
 
     return NextResponse.json(parsedData);
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message }, { status: 500 });
+    console.error("❌ [API ERROR] /api/generate-word 예외 발생:", error?.message || error);
+    return NextResponse.json(
+      { error: error?.message || "서버 내부 오류가 발생했습니다." },
+      { status: 500 }
+    );
   }
 }
