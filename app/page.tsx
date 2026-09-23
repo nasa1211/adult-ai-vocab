@@ -4,6 +4,7 @@ import { useState } from 'react';
 import WordCard, { WordData } from '@/components/WordCard';
 import PushSubscriptionButton from '@/components/PushSubscriptionButton';
 import ImageWordUploader from '@/components/ImageWordUploader';
+import { createClient } from '@/utils/supabase/client'; // 👈 Supabase 클라이언트 import 추가
 
 const SAMPLE_WORD: WordData = {
   word: 'Touch base',
@@ -34,13 +35,28 @@ export default function HomePage() {
     setToastMessage(null);
 
     try {
-      // 1. 학습 완료에 따른 출석 체크 API 자동 호출
-      const attendRes = await fetch('/api/attendance', { method: 'POST' });
+      // Supabase 세션에서 토큰 가져오기
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      // 1. 학습 완료에 따른 출석 체크 API 자동 호출 (Authorization 헤더 추가)
+      const attendRes = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token && {
+            Authorization: `Bearer ${session.access_token}`,
+          }),
+        },
+      });
+
       if (attendRes.ok) {
         const attendData = await attendRes.json();
         if (attendData.success) {
           setToastMessage(`🎉 오늘 학습 완료! ${attendData.current_streak}일 연속 학습 중!`);
         }
+      } else {
+        console.warn('출석 체크 실패 Status:', attendRes.status);
       }
 
       // 2. 다음 AI 단어 추천 생성
