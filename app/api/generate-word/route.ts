@@ -3,13 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const CANDIDATE_MODELS = [
-  "gemini-3.6-flash",
-  "gemini-2.5-flash",
-  "gemini-2.5-pro",
-  "gemini-3.1-flash-lite-preview",
-  "gemini-2.5-flash-lite",
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
+"gemini-3.7-flash",       // 1순위: 최신 초고속 모델 (기본 메인, 응답 속도 최상)
+  "gemini-3.6-flash",       // 2순위: 3.7 에러 시 빠른 대체
+  "gemini-3.5-flash",       // 3순위: 검증된 백업 Flash 모델
+  "gemini-3.1-pro-preview", // 4순위: Flash 계열 장애 시 고성능 추론 모델로 전환
+  "gemini-2.5-pro",         // 5순위: 최종 비상용 안정 버전
 ];
 
 function safeJsonParse(rawText: string) {
