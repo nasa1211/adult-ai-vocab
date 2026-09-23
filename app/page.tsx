@@ -29,24 +29,32 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // 학습 완료 & 다음 단어 불러오기
-  const handleFetchNextWord = async () => {
+  // app/page.tsx 내 handleFetchNextWord 함수 내부
+const handleFetchNextWord = async () => {
     setLoading(true);
     setToastMessage(null);
 
     try {
-      // Supabase 세션에서 토큰 가져오기
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
 
-      // 1. 학습 완료에 따른 출석 체크 API 자동 호출 (Authorization 헤더 추가)
+      // 💡 디버깅: 브라우저 콘솔에서 세션 유무 확인
+      console.log('현재 세션 상태:', session);
+
+      // 1. 세션(로그인 토큰)이 없는 경우 처리
+      if (!session) {
+        alert('출석 체크 및 학습 기록을 위해 먼저 로그인해주세요!');
+        // 필요시 로그인 페이지 이동: router.push('/login');
+        setLoading(false);
+        return;
+      }
+
+      // 2. 로그인된 경우에만 출석 체크 API 호출
       const attendRes = await fetch('/api/attendance', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(session?.access_token && {
-            Authorization: `Bearer ${session.access_token}`,
-          }),
+          'Authorization': `Bearer ${session.access_token}`,
         },
       });
 
@@ -56,10 +64,11 @@ export default function HomePage() {
           setToastMessage(`🎉 오늘 학습 완료! ${attendData.current_streak}일 연속 학습 중!`);
         }
       } else {
-        console.warn('출석 체크 실패 Status:', attendRes.status);
+        const errorData = await attendRes.json();
+        console.error('출석 체크 실패:', errorData);
       }
 
-      // 2. 다음 AI 단어 추천 생성
+      // 3. 다음 AI 단어 생성 호출
       const wordRes = await fetch('/api/generate-word', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,7 +83,6 @@ export default function HomePage() {
       console.error('학습 및 단어 불러오기 실패:', err);
     } finally {
       setLoading(false);
-      // 토스트 메시지 3초 후 자동 숨김
       setTimeout(() => setToastMessage(null), 3000);
     }
   };
