@@ -4,7 +4,7 @@ import { useState } from 'react';
 import WordCard, { WordData } from '@/components/WordCard';
 import PushSubscriptionButton from '@/components/PushSubscriptionButton';
 import ImageWordUploader from '@/components/ImageWordUploader';
-import { createClient } from '@/utils/supabase/client'; // 👈 Supabase 클라이언트 import 추가
+import { createClient } from '@/lib/supabase/client'; // 👈 Supabase 클라이언트 import 추가
 
 const SAMPLE_WORD: WordData = {
   word: 'Touch base',
