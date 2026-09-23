@@ -1,69 +1,81 @@
-import Image from "next/image";
+// app/page.tsx
+'use client';
 
-export default function Home() {
+import { useState } from 'react';
+import WordCard, { WordData } from '@/components/WordCard';
+import PushSubscriptionButton from '@/components/PushSubscriptionButton';
+
+const SAMPLE_WORD: WordData = {
+  word: 'Touch base',
+  phonetic: '/tʌtʃ beɪs/',
+  meaning: '(건으로) 간단히 연락하다 / 소통하다',
+  category: 'Business English',
+  nuance:
+    '공식적인 긴 미팅이 아니라, 진행 상황을 가볍게 점검하거나 의견을 교환하기 위해 연락할 때 쓰는 대표적인 직장인 표현입니다.',
+  example_sentence: "Let's touch base on this before EOD.",
+  example_translation: '오늘 퇴근 전(EOD)에 이 건으로 간단히 이야기 나누시죠.',
+  speaking_tip: "'터치'와 '베이스'를 멈추지 말고 '터치베이스'처럼 이어서 발음하세요.",
+  quick_quiz: {
+    question: "다음 중 'Touch base'와 가장 가까운 표현은?",
+    options: ['진행 상황 짧게 체크하기', '계약서에 서명하기', '사과 인사 전하기'],
+    answer_index: 0,
+    explanation: "'Touch base'는 간단한 경과 보고나 연락을 뜻합니다.",
+  },
+};
+
+export default function HomePage() {
+  const [wordData, setWordData] = useState<WordData>(SAMPLE_WORD);
+  const [loading, setLoading] = useState(false);
+
+  // 다음 단어 AI 생성 호출
+  const handleFetchNextWord = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/generate-word', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word: 'Leverage', category: 'Business' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWordData(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 flex flex-col items-center justify-center gap-8">
+      {/* 헤더 */}
+      <div className="text-center space-y-2">
+        <h1 className="text-2xl font-bold tracking-tight text-white">
+          Adult AI Vocab <span className="text-blue-500 text-sm font-normal">3-Min Coach</span>
+        </h1>
+        <p className="text-xs text-slate-400">
+          바쁜 직장인을 위한 출퇴근 맞춤 실전 영단어
+        </p>
+      </div>
+
+      {/* 푸시 알림 배너 */}
+      <div className="w-full max-w-md">
+        <PushSubscriptionButton />
+      </div>
+
+      {/* 카드 UI */}
+      <div className="w-full max-w-md">
+        {loading ? (
+          <div className="w-full h-[520px] bg-slate-900/50 border border-slate-800 rounded-3xl flex items-center justify-center">
+            <p className="text-xs text-slate-400 animate-pulse">
+              AI 멘토가 다음 실전 단어를 준비 중입니다...
+            </p>
+          </div>
+        ) : (
+          <WordCard data={wordData} onNext={handleFetchNextWord} />
+        )}
+      </div>
+    </main>
   );
 }
