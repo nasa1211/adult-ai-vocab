@@ -1,80 +1,124 @@
-// app/page.tsx
 'use client';
 
-import { useState } from 'react';
-import WordCard, { WordData } from '@/components/WordCard';
-import PushSubscriptionButton from '@/components/PushSubscriptionButton';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { Flame, Trophy, Calendar, LogOut, CheckCircle } from 'lucide-react';
+import AuthModal from '@/components/AuthModal';
 
-const SAMPLE_WORD: WordData = {
-  word: 'Touch base',
-  phonetic: '/tʌtʃ beɪs/',
-  meaning: '(건으로) 간단히 연락하다 / 소통하다',
-  category: 'Business English',
-  nuance:
-    '공식적인 긴 미팅이 아니라, 진행 상황을 가볍게 점검하거나 의견을 교환하기 위해 연락할 때 쓰는 대표적인 직장인 표현입니다.',
-  example_sentence: "Let's touch base on this before EOD.",
-  example_translation: '오늘 퇴근 전(EOD)에 이 건으로 간단히 이야기 나누시죠.',
-  speaking_tip: "'터치'와 '베이스'를 멈추지 말고 '터치베이스'처럼 이어서 발음하세요.",
-  quick_quiz: {
-    question: "다음 중 'Touch base'와 가장 가까운 표현은?",
-    options: ['진행 상황 짧게 체크하기', '계약서에 서명하기', '사과 인사 전하기'],
-    answer_index: 0,
-    explanation: "'Touch base'는 간단한 경과 보고나 연락을 뜻합니다.",
-  },
-};
+export default function MyPage() {
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [attending, setAttending] = useState(false);
+  const supabase = createClient();
 
-export default function HomePage() {
-  const [wordData, setWordData] = useState<WordData>(SAMPLE_WORD);
-  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    fetchProfile();
+  }, []);
 
-  // 다음 단어 AI 생성 호출
-  const handleFetchNextWord = async () => {
+  const fetchProfile = async () => {
     setLoading(true);
-    try {
-      const res = await fetch('/api/generate-word', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: 'Leverage', category: 'Business' }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setWordData(data);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      setProfile(data || { email: user.email, current_streak: 0, longest_streak: 0 });
     }
+    setLoading(false);
   };
 
+  const handleCheckIn = async () => {
+    setAttending(true);
+    const res = await fetch('/api/attendance', { method: 'POST' });
+    if (res.ok) {
+      await fetchProfile();
+    }
+    setAttending(false);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setProfile(null);
+  };
+
+  if (loading) {
+    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-xs text-slate-400">불러오는 중...</div>;
+  }
+
+  if (!profile) {
+    return (
+      <main className="min-h-screen bg-slate-950 py-12 px-4 flex items-center justify-center">
+        <AuthModal />
+      </main>
+    );
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isCheckedInToday = profile.last_visited_at === todayStr;
+
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 flex flex-col items-center justify-center gap-8">
-      {/* 헤더 */}
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight text-white">
-          Adult AI Vocab <span className="text-blue-500 text-sm font-normal">3-Min Coach</span>
-        </h1>
-        <p className="text-xs text-slate-400">
-          바쁜 직장인을 위한 출퇴근 맞춤 실전 영단어
-        </p>
+    <main className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 max-w-md mx-auto space-y-6">
+      {/* 1. 상단 유저 프로필 헤더 */}
+      <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl flex items-center justify-between">
+        <div>
+          <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider">Learner Profile</span>
+          <h1 className="text-base font-bold text-white mt-0.5">{profile.display_name || profile.email}</h1>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="p-2 text-slate-400 hover:text-rose-400 transition-colors"
+          title="로그아웃"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* 푸시 알림 배너 */}
-      <div className="w-full max-w-md">
-        <PushSubscriptionButton />
-      </div>
-
-      {/* 카드 UI */}
-      <div className="w-full max-w-md">
-        {loading ? (
-          <div className="w-full h-[520px] bg-slate-900/50 border border-slate-800 rounded-3xl flex items-center justify-center">
-            <p className="text-xs text-slate-400 animate-pulse">
-              AI 멘토가 다음 실전 단어를 준비 중입니다...
-            </p>
+      {/* 2. Streak 대시보드 카드 */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* 현재 스트릭 */}
+        <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl relative overflow-hidden">
+          <div className="flex items-center gap-2 text-orange-400 mb-2">
+            <Flame className="w-5 h-5 fill-orange-400/20" />
+            <span className="text-xs font-semibold">연속 학습</span>
           </div>
-        ) : (
-          <WordCard data={wordData} onNext={handleFetchNextWord} />
-        )}
+          <p className="text-3xl font-extrabold text-white">{profile.current_streak || 0}<span className="text-sm font-normal text-slate-400 ml-1">일</span></p>
+          <p className="text-[10px] text-slate-500 mt-2">매일 1단어 이상 학습 달성</p>
+        </div>
+
+        {/* 최장 스트릭 */}
+        <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl">
+          <div className="flex items-center gap-2 text-amber-400 mb-2">
+            <Trophy className="w-5 h-5" />
+            <span className="text-xs font-semibold">최고 기록</span>
+          </div>
+          <p className="text-3xl font-extrabold text-white">{profile.longest_streak || 0}<span className="text-sm font-normal text-slate-400 ml-1">일</span></p>
+          <p className="text-[10px] text-slate-500 mt-2">나의 역대 최대 Streak</p>
+        </div>
+      </div>
+
+      {/* 3. 오늘 출석 체크 액션 버튼 */}
+      <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl text-center">
+        <div className="inline-flex p-3 bg-emerald-500/10 text-emerald-400 rounded-full mb-3">
+          <Calendar className="w-6 h-6" />
+        </div>
+        <h3 className="font-bold text-sm mb-1">오늘의 학습 출석 완료하기</h3>
+        <p className="text-xs text-slate-400 mb-5 leading-relaxed">
+          {isCheckedInToday ? '오늘의 출석이 완료되었습니다! 내일도 연속 학습을 이어가세요.' : '오늘의 단어 학습 카드를 마스터하고 출석 도장을 찍으세요.'}
+        </p>
+
+        <button
+          onClick={handleCheckIn}
+          disabled={isCheckedInToday || attending}
+          className={`w-full py-3 px-4 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 ${
+            isCheckedInToday
+              ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-default'
+              : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 active:scale-95'
+          }`}
+        >
+          {attending ? '출석 기록 중...' : isCheckedInToday ? <><CheckCircle className="w-4 h-4" /> 오늘 출석 완료</> : '🔥 오늘 학습 완료 및 출석하기'}
+        </button>
       </div>
     </main>
   );
